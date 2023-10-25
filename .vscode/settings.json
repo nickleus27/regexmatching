@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "*.c ": "c",
+        "iostream": "cpp",
+        "vector": "cpp",
+        "__config": "cpp",
+        "chrono": "cpp",
+        "any": "cpp",
+        "regex": "cpp",
+        "string": "cpp"
+    }
+}
