@@ -19,9 +19,14 @@ public:
 
     typedef struct _state
     {
-        int currstate;
+        int exits;
         char currchar;
         struct _state *trans;
+        struct _state *backtrans;
+        /**
+         * TODO:
+         * Need pointer to transition states to back track to with wildcard *
+         */
     } State;
 
     typedef struct _entry
@@ -71,17 +76,18 @@ public:
     }
 
     void
-    linkstates(StackEntry *preventry, State *state)
+    linkstates(StackEntry *preventry, State *nextstate)
     {
-        if (preventry->last)
+        State *prevstate = preventry->last ? preventry->last : preventry->start;
+
+        prevstate->trans = nextstate; // prev state transition points to next state
+        // check for a backwards transition (* operator) with wildcard
+        if (prevstate->exits == transition::split && prevstate->currchar == '.')
         {
-            preventry->last->trans = state; // prev char points to next state
+            nextstate->exits = transition::split;
+            nextstate->backtrans = prevstate->backtrans;
         }
-        else
-        {
-            preventry->start->trans = state; // prev char points to next state
-        }
-        preventry->last = state;
+        preventry->last = nextstate; // maintain pointer to last state
     }
 
     std::vector<StackEntry>
@@ -90,33 +96,29 @@ public:
         std::vector<StackEntry> stack;
         for (std::string::iterator ch = postre->begin(); ch != postre->end(); ch++)
         {
-            if (*ch != '#')
+            if (*ch != '#') // not concat, add state to stack
             {
-                if (*ch != '*')
+                if (*ch != '*') // standard char (or wildcard) add it to stack
                 {
-                    State *state = (State*)malloc(sizeof(State));
+                    State *state = (State *)malloc(sizeof(State));
                     state->currchar = *ch;
-                    state->currstate = transition::single;
+                    state->exits = transition::single;
                     state->trans = nullptr;
                     StackEntry entry = {state, nullptr};
                     stack.push_back(entry);
                 }
-                else
+                else // 0 or more repitions, modify transition
                 {
                     StackEntry preventry = stack.back();
                     stack.pop_back();
-                    if (preventry.last)
-                    {
-                        preventry.last->currstate = transition::split;
-                    }
-                    else
-                    {
-                        preventry.start->currstate = transition::split;
-                    }
+                    State *prevstate = preventry.last ? preventry.last : preventry.start;
+                    prevstate->exits = transition::split;
+                    prevstate->backtrans = prevstate;
+
                     stack.push_back(preventry);
                 }
             }
-            else
+            else // pop stack symbol and link transition states (concantenate)
             {
                 StackEntry entry1 = stack.back();
                 stack.pop_back();
@@ -134,15 +136,18 @@ public:
     isMatch(std::string s, std::string p)
     {
         std::string re = get_postfix_re(&p);
+        std::cout << "post reg " << re << std::endl;
         State *state = compile_nfa(&re).front().start;
+        std::string::iterator ch = s.begin();
+        std::string::iterator end = s.end();
 
-        for (std::string::iterator ch = s.begin(); ch != s.end(); ch++)
+        while (ch != s.end())
         {
             if (!state)
             {
                 return false;
             }
-            if (state->currstate == transition::single)
+            if (state->exits == transition::single) // single state transition
             {
                 if (state->currchar == *ch || state->currchar == '.')
                 {
@@ -153,23 +158,31 @@ public:
                     return false;
                 }
             }
-            else
+            else // multi state transition
             {
-                State *trans = state->trans;
-                if (trans && trans->currchar == *ch)
+                State *lookahead = state->trans;
+                if (lookahead && (lookahead->currchar == *ch || lookahead->currchar == '.'))
                 {
-                    state = trans;
+                    if (lookahead->exits == transition::single)
+                    {
+                        state = lookahead->trans;
+                    }
+                    else
+                    {
+                        state = lookahead;
+                    }
                 }
                 else
                 {
-                    if (state->currchar != *ch && state->currchar != '.')
+                    if (state->currchar != *ch && state->currchar != '.') // stay in the same state if char repeats else false
                     {
                         return false;
                     }
                 }
             }
+            ch++;
         }
-        if (state && state->trans)
+        if ((state && state->trans) || ch != end)
         {
             return false;
         }
