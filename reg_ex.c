@@ -371,20 +371,28 @@ int match(State *start, char *s)
 
 int main(int argc, char **argv)
 {
-    int i;
+#define BUFF_SIZE 16
+    int i = 0;
+    int n = 0;
+    char reg[BUFF_SIZE];
+    char strings[10][BUFF_SIZE];
     char *post;
     State *start;
+#undef BUFF_SIZE
 
-    if (argc < 3)
-    {
-        fprintf(stderr, "usage: nfa regexp string...\n");
-        return 1;
-    }
+    // if (argc < 3)
+    // {
+    //     fprintf(stderr, "usage: nfa regexp string...\n");
+    //     return 1;
+    // }
 
-    post = re2post(argv[1]);
+    printf("Enter a regex: ");
+    scanf("%15s", reg);
+
+    post = re2post(reg);
     if (post == NULL)
     {
-        fprintf(stderr, "bad regexp %s\n", argv[1]);
+        fprintf(stderr, "bad regexp %s\n", reg);
         return 1;
     }
 
@@ -395,11 +403,17 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    l1.s = malloc(nstate * sizeof l1.s[0]);
-    l2.s = malloc(nstate * sizeof l2.s[0]);
-    for (i = 2; i < argc; i++)
-        if (match(start, argv[i]))
-            printf("%s\n", argv[i]);
+    printf("Enter up to 10 strings to match. End with EOF (ctrl-d)\n");
+    while (scanf("%15s", strings[i++]) != EOF);
+    n = i + 1;
+
+    l1.s = malloc(nstate * sizeof l1.s[0]); // global
+    l2.s = malloc(nstate * sizeof l2.s[0]); // global
+    for (i = 0; i < n; i++)
+    {
+        if (match(start, strings[i]))
+            printf("%s\n", strings[i]);
+    }
     return 0;
 }
 
