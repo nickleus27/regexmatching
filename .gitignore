@@ -1,4 +1,5 @@
 *.dSYM/
 reg_match
 reg_ex
-reg_*_debug
+regmatch2
+*_debug
