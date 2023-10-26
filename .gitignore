@@ -1,3 +1,4 @@
 *.dSYM/
 reg_match
+reg_ex
 reg_match_debug
