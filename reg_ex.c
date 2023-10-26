@@ -345,7 +345,7 @@ void step(List *clist, int c, List *nlist)
     for (i = 0; i < clist->n; i++)
     {
         s = clist->s[i];
-        if (s->c == c)
+        if (s->c == c || s->c == '.')
             addstate(nlist, s->out);
     }
 }
