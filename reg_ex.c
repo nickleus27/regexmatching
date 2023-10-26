@@ -47,7 +47,7 @@ re2post(char *re)
             if (natom > 1)
             {
                 --natom;
-                *dst++ = '.';
+                *dst++ = '#';
             }
             if (p >= paren + 100)
                 return NULL;
@@ -61,7 +61,7 @@ re2post(char *re)
             if (natom == 0)
                 return NULL;
             while (--natom > 0)
-                *dst++ = '.';
+                *dst++ = '#';
             nalt++;
             break;
         case ')':
@@ -70,7 +70,7 @@ re2post(char *re)
             if (natom == 0)
                 return NULL;
             while (--natom > 0)
-                *dst++ = '.';
+                *dst++ = '#';
             for (; nalt > 0; nalt--)
                 *dst++ = '|';
             --p;
@@ -89,7 +89,7 @@ re2post(char *re)
             if (natom > 1)
             {
                 --natom;
-                *dst++ = '.';
+                *dst++ = '#';
             }
             *dst++ = *re;
             natom++;
@@ -99,7 +99,7 @@ re2post(char *re)
     if (p != paren)
         return NULL;
     while (--natom > 0)
-        *dst++ = '.';
+        *dst++ = '#';
     for (; nalt > 0; nalt--)
         *dst++ = '|';
     *dst = 0;
@@ -239,7 +239,7 @@ post2nfa(char *postfix)
             s = state(*p, NULL, NULL);
             push(frag(s, list1(&s->out)));
             break;
-        case '.': /* catenate */
+        case '#': /* catenate */
             e2 = pop();
             e1 = pop();
             patch(e1.out, e2.start);
