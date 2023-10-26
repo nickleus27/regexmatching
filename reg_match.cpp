@@ -21,12 +21,9 @@ public:
     {
         int exits;
         char currchar;
+        bool matching;
         struct _state *trans;
         struct _state *backtrans;
-        /**
-         * TODO:
-         * Need pointer to transition states to back track to with wildcard *
-         */
     } State;
 
     typedef struct _entry
@@ -82,12 +79,35 @@ public:
 
         prevstate->trans = nextstate; // prev state transition points to next state
         // check for a backwards transition (* operator) with wildcard
-        if (prevstate->exits == transition::split && prevstate->currchar == '.')
+        /**
+         * TODO: Need to implemnent backtrans for nextsate == '.'
+         */
+        if (prevstate->exits == transition::split && (prevstate->currchar == '.' || nextstate->currchar == '.'))
         {
             nextstate->exits = transition::split;
             nextstate->backtrans = prevstate->backtrans;
         }
         preventry->last = nextstate; // maintain pointer to last state
+    }
+
+    void
+    matchstate(std::vector<StackEntry> *stack)
+    {
+        State *last = stack->front().last ? stack->front().last : stack->front().start;
+        if (last->exits == transition::split)
+        {
+            last->matching = true;
+        }
+        else
+        {
+            State *match = (State *)malloc(sizeof(State));
+            match->matching = true;
+            match->currchar = '\0';
+            match->exits = transition::single;
+            match->trans = nullptr;
+            match->backtrans = nullptr;
+            last->trans = match;
+        }
     }
 
     std::vector<StackEntry>
@@ -103,7 +123,9 @@ public:
                     State *state = (State *)malloc(sizeof(State));
                     state->currchar = *ch;
                     state->exits = transition::single;
+                    state->matching = false;
                     state->trans = nullptr;
+                    state->backtrans = nullptr;
                     StackEntry entry = {state, nullptr};
                     stack.push_back(entry);
                 }
@@ -129,6 +151,7 @@ public:
                 stack.push_back(entry2);
             }
         }
+        matchstate(&stack);
         return stack;
     }
 
@@ -160,6 +183,9 @@ public:
             }
             else // multi state transition
             {
+                /**
+                 * TODO: Need to implement backtracking (backtrans)
+                 */
                 State *lookahead = state->trans;
                 if (lookahead && (lookahead->currchar == *ch || lookahead->currchar == '.'))
                 {
@@ -172,17 +198,18 @@ public:
                         state = lookahead;
                     }
                 }
-                else
+                else if (state->currchar == *ch || state->currchar == '.')
                 {
-                    if (state->currchar != *ch && state->currchar != '.') // stay in the same state if char repeats else false
-                    {
-                        return false;
-                    }
+                    state = state->backtrans;
+                }
+                else // no match
+                {
+                    return false;
                 }
             }
             ch++;
         }
-        if ((state && state->trans) || ch != end)
+        if ((state && !state->matching) || ch != end)
         {
             return false;
         }
