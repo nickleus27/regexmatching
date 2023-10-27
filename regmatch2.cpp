@@ -20,15 +20,23 @@ public:
     bool
     isMatch(std::string s, std::string p)
     {
+        std::string postre = this->get_postfix_re(&p);
         this->size = 0;
         this->listid = 0;
         this->matchstate = new State(this);
-        this->compile_nfa(&p);
+        this->compile_nfa(&postre);
 
         return false;
     }
 
 private:
+    /*
+    * From http://swtch.com/~rsc/regexp/
+    * Represents an NFA state plus zero or one or two arrows exiting.
+    * if c == Match, no arrows out; matching state.
+    * If c == Split, unlabeled arrows to out and out1 (if != NULL).
+    * If c < 256, labeled arrow with character c to out.
+    */
     enum transition
     {
         match = 256, // numbers out of char range
@@ -41,8 +49,8 @@ private:
         Solution *nfa;
         int ch;
         int lastlist;
-        State *trans1;
-        State *trans2;
+        State *trans1; // transitions
+        State *trans2; // transitions
         State(int ch, State *trans1, State *trans2, Solution *nfa)
         {
             this->nfa = nfa;
@@ -68,19 +76,21 @@ private:
      * as storage for the Ptrlists.
      *
      * This seeems to be a little indirection magic to save space making transition list
+     * Ptrlist is syntactic sugar. Ptrlist pointer is just a really a pointer to a state pointer.
+     * This way we can make a chain (list) of connected states.
      */
     typedef union _ptrlist
     {
-        State *start;
-        _ptrlist *next;
+        State *state;
+        _ptrlist *next; // next state
     } Ptrlist;
 
     typedef struct _frag // class objects for nfa fragments to keep on stack while constructing nfa
     {
         State *start;
-        Ptrlist *trans;
+        Ptrlist *trans; // state transition list
     } Frag;
-    
+
     Frag frag(State *start, Ptrlist *trans)
     {
         Frag f;
@@ -132,15 +142,18 @@ private:
     void
     linkstates(Frag *prevfrag, Frag *nextfrag)
     {
-        Ptrlist *list = prevfrag->trans; // set transitions to point to the next state
-        State *state = nextfrag->start;
+        Ptrlist *list = prevfrag->trans; // state transition list
+        State *state = nextfrag->start; // state to transition to
 
         Ptrlist *nexttrans;
 
         for (; list; list = nexttrans)
         {
+            // set transitions to point to the next state
+            // thank you union for syntactic sugar to transition to next sate with next
+            // and set next state to sate all with the same space in memory
             nexttrans = list->next;
-            list->start = state;
+            list->state = state;
         }
     }
 
@@ -190,7 +203,7 @@ private:
                 next = frag(s, makelist(&s->trans1));
                 linkstates (&prev, &next); // todo: need to pass in frag not state
 
-                stack.push_back(frag(s, makelist(&s->trans1)));
+                stack.push_back(frag(s, makelist(&s->trans2))); // NOTE: HERE WE ARE USING TRANS2 (transition 2) for the fragment
                 break;
             }
         }
@@ -205,12 +218,6 @@ private:
         return prev.start;
     }
 };
-
-/**
- * TODO: Failing testcases:
- * "aaa"
- * ab*a*c*a
- */
 
 int main()
 {
