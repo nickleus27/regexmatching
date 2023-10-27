@@ -1,7 +1,6 @@
 #include <vector>
 #include <string>
 #include <iostream>
-#include <stdlib.h>
 
 /**
  * @brief Use Ken Thompsons Regex Search Algorithm
@@ -10,38 +9,21 @@
  */
 class Solution
 {
-    class State;
-
-public:
-    int size;   // keep track of number of states
-    int listid; // keep track of where we are at in state list
-    State *matchstate; // singleton matchstate
-
-    bool
-    isMatch(std::string s, std::string p)
-    {
-        std::string postre = this->get_postfix_re(&p);
-        this->size = 0;
-        this->listid = 0;
-        this->matchstate = new State(this);
-        this->compile_nfa(&postre);
-
-        return false;
-    }
-
 private:
     /*
-    * From http://swtch.com/~rsc/regexp/
-    * Represents an NFA state plus zero or one or two arrows exiting.
-    * if c == Match, no arrows out; matching state.
-    * If c == Split, unlabeled arrows to out and out1 (if != NULL).
-    * If c < 256, labeled arrow with character c to out.
-    */
+     * From http://swtch.com/~rsc/regexp/
+     * Represents an NFA state plus zero or one or two arrows exiting.
+     * if c == Match, no arrows out; matching state.
+     * If c == Split, unlabeled arrows to out and out1 (if != NULL).
+     * If c < 256, labeled arrow with character c to out.
+     */
     enum transition
     {
         match = 256, // numbers out of char range
-        split = 257 // numbers out of char range
+        split = 257  // numbers out of char range
     };
+
+    // ----- Classes -----
 
     class State // class object for different states
     {
@@ -70,6 +52,24 @@ private:
         }
     };
 
+    class List
+    {
+    public:
+        int size;
+        std::vector<State *> *state;
+        List()
+        {
+            this->size = 0;
+            this->state = new std::vector<State *>;
+        }
+        ~List()
+        {
+            delete this->state;
+        }
+    };
+
+    // ----- Unions & Structs -----
+
     /* From (http://swtch.com/~rsc/regexp/)
      * Since the out pointers in the list are always
      * uninitialized, we use the pointers themselves
@@ -91,6 +91,15 @@ private:
         Ptrlist *trans; // state transition list
     } Frag;
 
+    // ----- Member Vars -----
+
+    int size;          // keep track of number of states
+    int listid;        // keep track of where we are at in state list
+    State *matchstate; // singleton matchstate
+    State *start;
+
+    // ----- Functions -----
+
     Frag frag(State *start, Ptrlist *trans)
     {
         Frag f;
@@ -102,7 +111,7 @@ private:
     /**
      * @brief Takes a regex string and return s a postfix version
      *
-     * @param re
+     * @param re string
      * @return std::string
      */
     std::string
@@ -143,7 +152,7 @@ private:
     linkstates(Frag *prevfrag, Frag *nextfrag)
     {
         Ptrlist *list = prevfrag->trans; // state transition list
-        State *state = nextfrag->start; // state to transition to
+        State *state = nextfrag->start;  // state to transition to
 
         Ptrlist *nexttrans;
 
@@ -201,7 +210,7 @@ private:
 
                 // fix this later?
                 next = frag(s, makelist(&s->trans1));
-                linkstates (&prev, &next); // todo: need to pass in frag not state
+                linkstates(&prev, &next); // todo: need to pass in frag not state
 
                 stack.push_back(frag(s, makelist(&s->trans2))); // NOTE: HERE WE ARE USING TRANS2 (transition 2) for the fragment
                 break;
@@ -210,12 +219,33 @@ private:
         prev = stack.back();
         stack.pop_back();
 
-
         // can check stack size for errors here;
         next = frag(matchstate, makelist(&s->trans1)); // fix later
 
         linkstates(&prev, &next);
         return prev.start;
+    }
+
+public:
+    ~Solution()
+    {
+    }
+
+    bool
+    isMatch(std::string s, std::string p)
+    {
+        std::string postre = this->get_postfix_re(&p);
+        List charlist;
+        List statelist;
+        State *start;
+        this->size = 0;
+        this->listid = 0;
+        this->matchstate = new State(this);
+        this->start = this->compile_nfa(&postre);
+        charlist.state->resize(this->size);
+        statelist.state->resize(this->size);
+
+        return false;
     }
 };
 
