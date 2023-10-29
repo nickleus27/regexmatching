@@ -1,7 +1,6 @@
 *.dSYM/
-reg_match
 reg_ex
-regmatch2
+regmatch
 *_debug
 .vscode
 reg_ex.c
