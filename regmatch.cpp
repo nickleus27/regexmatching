@@ -63,14 +63,6 @@ private:
         }
         ~State()
         {
-            // if (this->trans1)
-            // {
-            //     delete this->trans1;
-            // }
-            // if (this->trans2)
-            // {
-            //     delete this->trans2;
-            // }
         }
     };
 
@@ -85,10 +77,10 @@ private:
         }
         ~StateList()
         {
-            // if (this->statelist)
-            // {
-            //     delete this->statelist;
-            // }
+            if (this->statelist)
+            {
+                delete this->statelist;
+            }
         }
         void resize(int size)
         {
@@ -102,9 +94,9 @@ private:
         {
             return this->statelist->at(index);
         }
+
     private:
         std::vector<State *> *statelist;
-
     };
 
     // ----- Unions & Structs -----
@@ -326,14 +318,36 @@ public:
     }
     ~Solution()
     {
-        // if (this->start)
-        // {
-        //     delete this->start;
-        // }
-        // else
-        // {
-        //     delete this->matchstate;
-        // }
+        State *temp;
+        if (this->start)
+        {
+            while (this->start)
+            {
+                switch (this->start->ch)
+                {
+                case transition::split:
+                    delete this->start->trans1; // this node contains a cycle back to split, dont traverse
+                    temp = this->start;
+                    this->start = this->start->trans2;
+                    delete temp;
+                    break;
+                case transition::match:
+                    temp = this->start;
+                    this->start = nullptr;
+                    delete temp;
+                    break;
+                default:
+                    temp = this->start;
+                    this->start = this->start->trans1;
+                    delete temp;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            delete this->matchstate;
+        }
     }
 
     /**
@@ -353,16 +367,16 @@ public:
     bool
     isMatch(std::string s, std::string p)
     {
+        int charval;
+        bool retval;
+        StateList *temp = nullptr;
         std::string postre = this->get_postfix_re(&p);
         StateList *currstate_list = new StateList();
         StateList *nextstate_list = new StateList();
+
         this->start = this->compile_nfa(&postre);
         currstate_list->resize(this->size);
         nextstate_list->resize(this->size);
-
-        int charval;
-        StateList *temp = nullptr;
-
         startlist(start, currstate_list);
         for (auto ch : s)
         {
@@ -372,9 +386,10 @@ public:
             currstate_list = nextstate_list;
             nextstate_list = temp; /* swap currentstate list, nextstate list */
         }
-        // delete currstate_list;
-        // delete nextstate_list;
-        return matched(currstate_list);
+        retval = matched(currstate_list);
+        delete currstate_list;
+        delete nextstate_list;
+        return retval;
     }
 };
 
