@@ -1,15 +1,15 @@
 /**
  * Nick Anderson
  * October 27, 2023
- * 
+ *
  * I wanted to use se Ken Thompson's Regex Search Algorithm
  * to compile a nfa for the regex to solve Leetcode problem
  * # 10. Regular Expression Matching
- * 
+ *
  * So I modified code authored by Russ Cox which was written in C
  * and can be found at this web address
  * http://swtch.com/~rsc/regexp/
- * 
+ *
  * Here is a link to Ken Thompson's regex algorithm article
  * https://dl.acm.org/doi/pdf/10.1145/363347.363387
  */
@@ -78,19 +78,33 @@ private:
     {
     public:
         int size;
-        std::vector<State *> *state;
         StateList()
         {
             this->size = 0;
-            this->state = new std::vector<State *>;
+            this->statelist = new std::vector<State *>();
         }
         ~StateList()
         {
-            // if (this->state)
+            // if (this->statelist)
             // {
-            //     delete this->state;
+            //     delete this->statelist;
             // }
         }
+        void resize(int size)
+        {
+            this->statelist->resize(size);
+        }
+        void addstate(State *state)
+        {
+            this->statelist->at(this->size++) = state;
+        }
+        State *getstate(int index)
+        {
+            return this->statelist->at(index);
+        }
+    private:
+        std::vector<State *> *statelist;
+
     };
 
     // ----- Unions & Structs -----
@@ -106,14 +120,14 @@ private:
      */
     typedef union _ptrlist
     {
-        State *state;
         _ptrlist *next; // next state
+        State *state;
     } Ptrlist;
 
     typedef struct _frag // class objects for nfa fragments to keep on stack while constructing nfa
     {
         State *start;
-        Ptrlist *trans; // state transition list
+        Ptrlist *translist; // state transition list
     } Frag;
 
     // ----- Member Vars -----
@@ -127,7 +141,7 @@ private:
 
     Frag frag(State *start, Ptrlist *trans)
     {
-        Frag f {start, trans};
+        Frag f{start, trans};
         return f;
     }
 
@@ -172,10 +186,8 @@ private:
     }
 
     void
-    linkstates(Frag *prevfrag, State *state)
+    linkstates(Ptrlist *translist, State *state)
     {
-        Ptrlist *list = prevfrag->trans; // state transition list
-
         Ptrlist *nexttrans;
 
         /**
@@ -184,13 +196,13 @@ private:
          * state to set? This is for Or operator where there
          * can be a list of transitions from the append function
          */
-        for (; list; list = nexttrans)
+        for (; translist; translist = nexttrans)
         {
             // set transitions to point to the next state
             // thank you union for syntactic sugar to transition to next sate with next
             // and set next state to sate all with the same space in memory
-            nexttrans = list->next;
-            list->state = state;
+            nexttrans = translist->next;
+            translist->state = state;
         }
     }
 
@@ -228,15 +240,18 @@ private:
                 stack.pop_back();
                 prev = stack.back();
                 stack.pop_back();
-                linkstates(&prev, next.start);
-                stack.push_back(frag(prev.start, next.trans)); // combine into one frag, start = prev, Ptrlist = next.trans
+                // concantenate states, prev fragment states point to next state (fragments start)
+                linkstates(prev.translist, next.start);
+                // fragment now holds state of previous fragment and transition list that points to the next state
+                stack.push_back(frag(prev.start, next.translist)); // combine into one frag, start = prev, Ptrlist = next.trans
                 break;
             case '*': /* zero or more */
                 prev = stack.back();
                 stack.pop_back();
                 // new split state. trans1 points back to prev char
-                state = new State(Solution::transition::split, prev.start, nullptr, this);
-                linkstates(&prev, state);
+                state = new State(transition::split, prev.start, nullptr, this);
+                // prev fragments transitions now point to new state
+                linkstates(prev.translist, state);
                 prev = frag(state, makelist(&state->trans2));
                 // fragment now holding split state trans2 (transition list2). trans1 points back to last char
                 stack.push_back(prev); // NOTE: HERE WE ARE USING TRANS2 (transition 2) for the fragment
@@ -246,12 +261,11 @@ private:
         prev = stack.back();
         stack.pop_back();
         // can check stack size for errors here;
-        linkstates(&prev, this->matchstate);
+        linkstates(prev.translist, this->matchstate);
         return prev.start;
     }
 
     // _________________ MATCH _________________________
-
 
     void addstate(State *state, StateList *list)
     {
@@ -268,36 +282,37 @@ private:
             addstate(state->trans2, list);
             return; // bail out so we dont add split state to list
         }
-        list->state->at(list->size++) = state;
+        list->addstate(state);
     }
 
     void startlist(State *start, StateList *list)
     {
+        list->size = 0;
         this->listid++;
         addstate(start, list);
     }
 
     /*
      * Comment from (http://swtch.com/~rsc/regexp/)
-     * "Step the NFA from the states in [curr_statelist]
+     * "Step the NFA from the states in [currstate_list]
      * past the character [charval],
-     * to create next NFA state set [next_statelist]."
+     * to create next NFA state set [nextstate_list]."
      * variable names replace with names used in this file
      */
-    void step(StateList *curr_statelist, int charval, StateList *next_statelist)
+    void step(StateList *currstate_list, int charval, StateList *nextstate_list)
     {
         State *state;
 
         this->listid++;
-        next_statelist->size = 0;
-        for (int i = 0; i < curr_statelist->size; i++)
+        nextstate_list->size = 0;
+        for (int i = 0; i < currstate_list->size; i++)
         {
-            state = curr_statelist->state->at(i);
+            state = currstate_list->getstate(i);
             if (state->ch == charval || state->ch == '.')
             {
                 // all states in the list are not split states
                 // so they will only have trans1 (transition 1)
-                addstate(state->trans1, next_statelist);
+                addstate(state->trans1, nextstate_list);
             }
         }
     }
@@ -311,25 +326,27 @@ public:
     }
     ~Solution()
     {
-        if (this->start)
-        {
-            delete this->start;
-        }
-        else
-        {
-            delete this->matchstate;
-        }
+        // if (this->start)
+        // {
+        //     delete this->start;
+        // }
+        // else
+        // {
+        //     delete this->matchstate;
+        // }
     }
 
     /**
      *  Comment from (http://swtch.com/~rsc/regexp/)
      *  "Check whether state list contains a match."
      * */
-    bool matched(StateList *l)
+    bool matched(StateList *list)
     {
-        for (int i = 0; i < l->size; i++)
-            if (l->state->at(i) == this->matchstate)
+        for (int i = 0; i < list->size; i++)
+            if (list->getstate(i) == this->matchstate)
+            {
                 return true;
+            }
         return false;
     }
 
@@ -337,25 +354,27 @@ public:
     isMatch(std::string s, std::string p)
     {
         std::string postre = this->get_postfix_re(&p);
-        StateList curr_statelist;
-        StateList next_statelist;
+        StateList *currstate_list = new StateList();
+        StateList *nextstate_list = new StateList();
         this->start = this->compile_nfa(&postre);
-        curr_statelist.state->resize(this->size);
-        next_statelist.state->resize(this->size);
+        currstate_list->resize(this->size);
+        nextstate_list->resize(this->size);
 
-        int i, charval;
+        int charval;
         StateList *temp = nullptr;
 
-        startlist(start, &curr_statelist);
+        startlist(start, currstate_list);
         for (auto ch : s)
         {
-            charval = ch & 0xFF;
-            step(&curr_statelist, charval, &next_statelist);
-            temp = &curr_statelist;
-            curr_statelist = next_statelist;
-            next_statelist = *temp; /* swap clist, nlist */
+            charval = ch & 0xFF; // bit mask values under 255
+            step(currstate_list, charval, nextstate_list);
+            temp = currstate_list;
+            currstate_list = nextstate_list;
+            nextstate_list = temp; /* swap currentstate list, nextstate list */
         }
-        return matched(&curr_statelist);
+        // delete currstate_list;
+        // delete nextstate_list;
+        return matched(currstate_list);
     }
 };
 
